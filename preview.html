@@ -1,0 +1,656 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans,sans-serif)}
+#fcs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:8px;min-height:600px}
+.panel{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:10px;overflow:hidden}
+.panel-title{font-size:11px;font-weight:500;color:var(--color-text-secondary);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px;border-bottom:0.5px solid var(--color-border-tertiary);padding-bottom:6px}
+.metric{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
+.metric-label{font-size:12px;color:var(--color-text-secondary)}
+.metric-value{font-size:13px;font-weight:500;color:var(--color-text-primary);font-variant-numeric:tabular-nums}
+.metric-value.warn{color:var(--color-text-warning)}
+.metric-value.crit{color:var(--color-text-danger)}
+.metric-value.ok{color:var(--color-text-success)}
+.gauge-row{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.gauge-label{font-size:11px;color:var(--color-text-secondary);width:70px;flex-shrink:0}
+.gauge-bar{flex:1;height:6px;background:var(--color-background-secondary);border-radius:3px;overflow:hidden}
+.gauge-fill{height:100%;border-radius:3px;transition:width .4s ease}
+.fill-blue{background:#378ADD}
+.fill-green{background:#639922}
+.fill-amber{background:#BA7517}
+.fill-red{background:#E24B4A}
+.fill-purple{background:#7F77DD}
+
+/* Artificial Horizon */
+#ah-canvas{display:block;margin:0 auto 6px}
+
+/* Mode badges */
+.mode-badge{display:inline-block;font-size:10px;font-weight:500;padding:2px 8px;border-radius:4px;margin-right:4px;margin-bottom:4px}
+.mode-ap{background:var(--color-background-info);color:var(--color-text-info)}
+.mode-athr{background:var(--color-background-success);color:var(--color-text-success)}
+.mode-nav{background:var(--color-background-secondary);color:var(--color-text-secondary)}
+.mode-hold{background:var(--color-background-warning);color:var(--color-text-warning)}
+
+/* Alert list */
+.alert-item{display:flex;align-items:flex-start;gap:6px;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary);font-size:12px}
+.alert-item:last-child{border-bottom:none}
+.alert-dot{width:8px;height:8px;border-radius:50%;margin-top:3px;flex-shrink:0}
+.dot-crit{background:#E24B4A}
+.dot-warn{background:#BA7517}
+.dot-info{background:#378ADD}
+.dot-ok{background:#639922}
+.alert-text{flex:1;color:var(--color-text-primary)}
+.alert-time{font-size:10px;color:var(--color-text-tertiary);flex-shrink:0}
+
+/* AI chat */
+#ai-log{height:130px;overflow-y:auto;font-size:11px;line-height:1.6;color:var(--color-text-secondary);margin-bottom:6px;scrollbar-width:thin}
+.ai-msg{padding:3px 0;border-bottom:0.5px solid var(--color-border-tertiary)}
+.ai-msg.ai{color:var(--color-text-primary)}
+.ai-msg.sys{color:var(--color-text-secondary)}
+.ai-msg.warn{color:var(--color-text-warning)}
+.ai-msg.crit{color:var(--color-text-danger)}
+#ai-input{width:100%;font-size:12px;padding:5px 8px;border:0.5px solid var(--color-border-secondary);border-radius:6px;background:var(--color-background-secondary);color:var(--color-text-primary);margin-bottom:4px}
+.btn-row{display:flex;gap:4px;flex-wrap:wrap}
+.fcs-btn{font-size:11px;padding:4px 10px;border:0.5px solid var(--color-border-secondary);border-radius:6px;background:transparent;color:var(--color-text-primary);cursor:pointer}
+.fcs-btn:hover{background:var(--color-background-secondary)}
+.fcs-btn.active{background:var(--color-background-info);color:var(--color-text-info);border-color:var(--color-border-info)}
+.fcs-btn.danger{background:var(--color-background-danger);color:var(--color-text-danger);border-color:var(--color-border-danger)}
+
+/* PFD speed tape */
+.speed-tape{position:relative;height:90px;width:48px;background:var(--color-background-secondary);border-radius:4px;overflow:hidden;flex-shrink:0}
+.speed-tick{position:absolute;right:0;width:100%;display:flex;align-items:center;justify-content:flex-end;font-size:9px;color:var(--color-text-secondary);padding-right:2px}
+.speed-ptr{position:absolute;right:0;left:0;height:14px;background:var(--color-background-info);border-radius:2px;display:flex;align-items:center;justify-content:flex-end;padding-right:3px;font-size:10px;font-weight:500;color:var(--color-text-info);transition:top .4s}
+
+/* Status bar */
+#status-bar{grid-column:1/-1;background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:8px;padding:6px 12px;display:flex;align-items:center;gap:12px;font-size:11px;color:var(--color-text-secondary)}
+#status-bar .sep{width:0.5px;height:14px;background:var(--color-border-tertiary)}
+.status-led{width:7px;height:7px;border-radius:50%;animation:blink 1s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+.led-green{background:#639922}
+.led-amber{background:#BA7517}
+.led-red{background:#E24B4A;animation:blink .5s infinite}
+
+/* Map canvas */
+#map-canvas{display:block;width:100%;border-radius:6px;margin-bottom:6px}
+
+/* Full width AI section */
+.full-row{grid-column:1/-1}
+
+/* Emergency banner */
+#emerg-banner{display:none;grid-column:1/-1;background:var(--color-background-danger);border:1px solid var(--color-border-danger);border-radius:8px;padding:8px 12px;text-align:center;font-weight:500;color:var(--color-text-danger);font-size:13px;animation:blink .5s infinite}
+</style>
+
+<div id="fcs">
+
+<!-- STATUS BAR -->
+<div id="status-bar">
+  <span class="status-led led-green" id="sys-led"></span>
+  <span id="sys-status">SİSTEM NORMAL</span>
+  <div class="sep"></div>
+  <span>FASES: <b id="phase-val">CRUISE</b></span>
+  <div class="sep"></div>
+  <span>UTC: <b id="utc-val">--:--:--</b></span>
+  <div class="sep"></div>
+  <span>UÇUŞ: <b>FLT-2847</b></span>
+  <div class="sep"></div>
+  <span>ROTA: <b>LTAI → LTBA</b></span>
+  <div class="sep"></div>
+  <span id="ai-status-bar" style="margin-left:auto;color:var(--color-text-info)">AI: HAZIR</span>
+</div>
+
+<!-- EMERGENCY BANNER -->
+<div id="emerg-banner">⚠ ACİL DURUM AKTİF — OTOMATİK MÜDAHALE DEVREDE ⚠</div>
+
+<!-- LEFT COL: PFD -->
+<div class="panel">
+  <div class="panel-title">Birincil Uçuş Göstergesi (PFD)</div>
+  <canvas id="ah-canvas" width="200" height="120"></canvas>
+  <div style="display:flex;gap:6px;margin-bottom:6px">
+    <div class="speed-tape" id="spd-tape">
+      <div class="speed-ptr" id="spd-ptr">280</div>
+    </div>
+    <div style="flex:1">
+      <div class="metric"><span class="metric-label">IAS (kt)</span><span class="metric-value" id="v-ias">280</span></div>
+      <div class="metric"><span class="metric-label">TAS (kt)</span><span class="metric-value" id="v-tas">312</span></div>
+      <div class="metric"><span class="metric-label">Mach</span><span class="metric-value" id="v-mach">0.78</span></div>
+      <div class="metric"><span class="metric-label">V/S (fpm)</span><span class="metric-value" id="v-vs">0</span></div>
+      <div class="metric"><span class="metric-label">Pitch (°)</span><span class="metric-value" id="v-pitch">2.1</span></div>
+      <div class="metric"><span class="metric-label">Bank (°)</span><span class="metric-value" id="v-bank">0.0</span></div>
+    </div>
+  </div>
+  <div class="gauge-row"><span class="gauge-label">G Kuvveti</span><div class="gauge-bar"><div class="gauge-fill fill-blue" id="g-fill" style="width:30%"></div></div><span class="metric-value" id="g-val" style="font-size:11px;width:28px;text-align:right">1.0g</span></div>
+  <div class="gauge-row"><span class="gauge-label">AoA (°)</span><div class="gauge-bar"><div class="gauge-fill fill-green" id="aoa-fill" style="width:20%"></div></div><span class="metric-value" id="aoa-val" style="font-size:11px;width:28px;text-align:right">3.2°</span></div>
+</div>
+
+<!-- CENTER: NAV + ENGINE -->
+<div class="panel">
+  <div class="panel-title">Navigasyon & Motor</div>
+  <canvas id="map-canvas" width="220" height="110"></canvas>
+  <div class="metric"><span class="metric-label">İrtifa (ft)</span><span class="metric-value" id="v-alt">35000</span></div>
+  <div class="metric"><span class="metric-label">HDG (°)</span><span class="metric-value" id="v-hdg">274</span></div>
+  <div class="metric"><span class="metric-label">Pozisyon</span><span class="metric-value" style="font-size:11px" id="v-pos">36.89°N 30.71°E</span></div>
+  <div style="margin:6px 0 4px;font-size:11px;font-weight:500;color:var(--color-text-secondary)">Motor Durumu</div>
+  <div class="gauge-row"><span class="gauge-label">Eng1 N1%</span><div class="gauge-bar"><div class="gauge-fill fill-green" id="e1-fill" style="width:72%"></div></div><span class="metric-value" id="e1-val" style="font-size:11px;width:32px;text-align:right">72%</span></div>
+  <div class="gauge-row"><span class="gauge-label">Eng2 N1%</span><div class="gauge-bar"><div class="gauge-fill fill-green" id="e2-fill" style="width:71%"></div></div><span class="metric-value" id="e2-val" style="font-size:11px;width:32px;text-align:right">71%</span></div>
+  <div class="gauge-row"><span class="gauge-label">EGT °C</span><div class="gauge-bar"><div class="gauge-fill fill-amber" id="egt-fill" style="width:62%"></div></div><span class="metric-value" id="egt-val" style="font-size:11px;width:32px;text-align:right">620°</span></div>
+  <div class="gauge-row"><span class="gauge-label">Yakıt kg</span><div class="gauge-bar"><div class="gauge-fill fill-blue" id="fuel-fill" style="width:68%"></div></div><span class="metric-value" id="fuel-val" style="font-size:11px;width:40px;text-align:right">13600</span></div>
+</div>
+
+<!-- RIGHT: SYSTEMS + MODES -->
+<div class="panel">
+  <div class="panel-title">Sistem & Otopilot Modları</div>
+  <div style="margin-bottom:8px">
+    <span class="mode-badge mode-ap" id="m-ap">AP1</span>
+    <span class="mode-badge mode-athr" id="m-athr">A/THR</span>
+    <span class="mode-badge mode-nav" id="m-nav">LNAV</span>
+    <span class="mode-badge mode-hold" id="m-alt">ALT HOLD</span>
+  </div>
+  <div class="metric"><span class="metric-label">Hidro P (psi)</span><span class="metric-value ok" id="v-hyd">3000</span></div>
+  <div class="metric"><span class="metric-label">Kabin bas.</span><span class="metric-value ok" id="v-cab">8000 ft</span></div>
+  <div class="metric"><span class="metric-label">Dış sıcaklık</span><span class="metric-value" id="v-oat">-52°C</span></div>
+  <div class="metric"><span class="metric-label">Rüzgar</span><span class="metric-value" id="v-wind">270/35kt</span></div>
+  <div class="metric"><span class="metric-label">ETA varış</span><span class="metric-value" id="v-eta">00:47</span></div>
+  <div style="margin:8px 0 4px;font-size:11px;font-weight:500;color:var(--color-text-secondary)">PID Kontrol Çıkışları</div>
+  <div class="gauge-row"><span class="gauge-label">Elevator</span><div class="gauge-bar"><div class="gauge-fill fill-purple" id="pid-elev" style="width:50%"></div></div><span class="metric-value" id="pid-elev-v" style="font-size:11px;width:36px;text-align:right">0.0°</span></div>
+  <div class="gauge-row"><span class="gauge-label">Aileron</span><div class="gauge-bar"><div class="gauge-fill fill-purple" id="pid-ail" style="width:50%"></div></div><span class="metric-value" id="pid-ail-v" style="font-size:11px;width:36px;text-align:right">0.0°</span></div>
+  <div class="gauge-row"><span class="gauge-label">Rudder</span><div class="gauge-bar"><div class="gauge-fill fill-purple" id="pid-rud" style="width:50%"></div></div><span class="metric-value" id="pid-rud-v" style="font-size:11px;width:36px;text-align:right">0.0°</span></div>
+</div>
+
+<!-- SECOND ROW LEFT: ALERTS -->
+<div class="panel">
+  <div class="panel-title">Uyarı & Alarm Sistemi</div>
+  <div id="alert-list">
+    <div class="alert-item"><div class="alert-dot dot-ok"></div><div class="alert-text">Tüm sistemler nominal</div><div class="alert-time" id="al-t0">00:00</div></div>
+  </div>
+</div>
+
+<!-- SECOND ROW CENTER: SCENARIO CONTROLS -->
+<div class="panel">
+  <div class="panel-title">Senaryo & Simülasyon</div>
+  <div class="btn-row" style="margin-bottom:8px">
+    <button class="fcs-btn active" onclick="setMode('normal')">Normal Uçuş</button>
+    <button class="fcs-btn" onclick="setMode('turbulence')">Türbülans</button>
+    <button class="fcs-btn" onclick="setMode('icing')">Buz Tutma</button>
+    <button class="fcs-btn danger" onclick="setMode('stall')">Stall Uyarısı</button>
+    <button class="fcs-btn danger" onclick="setMode('enginefail')">Motor Arıza</button>
+    <button class="fcs-btn danger" onclick="setMode('fire')">Yangın</button>
+    <button class="fcs-btn danger" onclick="setMode('tcas')">TCAS RA</button>
+    <button class="fcs-btn danger" onclick="setMode('gpws')">GPWS</button>
+  </div>
+  <div class="metric"><span class="metric-label">Aktif Senaryo</span><span class="metric-value" id="scenario-lbl">Normal Uçuş</span></div>
+  <div class="metric"><span class="metric-label">FCS Modu</span><span class="metric-value" id="fcs-mode-lbl">NORMAL LAW</span></div>
+  <div class="metric"><span class="metric-label">AI Tepki Süresi</span><span class="metric-value" id="ai-rt">—</span></div>
+  <div style="margin-top:8px;font-size:11px;color:var(--color-text-secondary)">
+    FCS → Fly-by-wire, çift bağımsız PID döngüsü, AI anomali katmanı
+  </div>
+</div>
+
+<!-- SECOND ROW RIGHT: AI COPILOT -->
+<div class="panel">
+  <div class="panel-title">AI Yardımcı Pilot</div>
+  <div class="metric"><span class="metric-label">Çalışma modu</span><span class="metric-value ok" id="ai-runtime-mode">LOKAL AI</span></div>
+  <div class="metric"><span class="metric-label">Risk seviyesi</span><span class="metric-value" id="ai-risk">DÜŞÜK</span></div>
+  <div id="ai-log"></div>
+  <input id="ai-input" placeholder="Pilot komutu girin... örn: durum, yakıt, alternatif, checklist" onkeydown="if(event.key==='Enter')askAI()"/>
+  <div class="btn-row">
+    <button class="fcs-btn" onclick="quickAsk('Uçuş durumunu değerlendir')">Durum</button>
+    <button class="fcs-btn" onclick="quickAsk('Yakıt hesabı yap')">Yakıt</button>
+    <button class="fcs-btn" onclick="quickAsk('Hava durumu analizi')">Hava</button>
+    <button class="fcs-btn" onclick="quickAsk('Alternatif havalimanı öner')">Alternatif</button>
+    <button class="fcs-btn" onclick="quickAsk('Acil durum checklist ver')">Checklist</button>
+    <button class="fcs-btn" onclick="quickAsk('Sistemi optimize et')">Optimize</button>
+  </div>
+</div>
+
+</div>
+
+<script>
+const S = {
+  ias:280, tas:312, mach:0.78, alt:35000, vs:0, pitch:2.1, bank:0.0,
+  hdg:274, lat:36.89, lon:30.71, g:1.0, aoa:3.2,
+  e1:72, e2:71, egt:620, fuel:13600,
+  hyd:3000, cab:8000, oat:-52, wind:'270/35kt', eta:47,
+  elevCmd:0, ailCmd:0, rudCmd:0,
+  mode:'normal', fcsLaw:'NORMAL LAW', phase:'CRUISE',
+  apOn:true, athrOn:true, alerts:[], simTime:0,
+  pidPitch:{kp:.8,ki:.05,kd:.3,integral:0,prevErr:0},
+  pidRoll:{kp:.6,ki:.03,kd:.2,integral:0,prevErr:0},
+  pidYaw:{kp:.4,ki:.02,kd:.15,integral:0,prevErr:0},
+  targetPitch:2.0, targetBank:0, targetHdg:274
+};
+let tick=0, lastAITime=0, emgActive=false;
+
+function pidUpdate(ctrl,err,dt){
+  ctrl.integral+=err*dt; ctrl.integral=Math.max(-20,Math.min(20,ctrl.integral));
+  const d=(err-ctrl.prevErr)/dt; ctrl.prevErr=err;
+  return ctrl.kp*err+ctrl.ki*ctrl.integral+ctrl.kd*d;
+}
+
+function clamp(v,mn,mx){return Math.max(mn,Math.min(mx,v))}
+function rnd(v,d=1){return parseFloat(v.toFixed(d))}
+function noise(a){return (Math.random()-0.5)*a*2}
+
+// === ARTIFICIAL HORIZON ===
+function drawAH(){
+  const c=document.getElementById('ah-canvas');
+  const ctx=c.getContext('2d'); const w=200,h=120;
+  ctx.clearRect(0,0,w,h);
+  ctx.save(); ctx.translate(w/2,h/2); ctx.rotate(-S.bank*Math.PI/180);
+  const off=S.pitch*2.5;
+  // sky
+  ctx.fillStyle='#1B4F8A'; ctx.fillRect(-200,-200,400,200+off); 
+  // ground
+  ctx.fillStyle='#6B4226'; ctx.fillRect(-200,off,400,200);
+  // horizon
+  ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(-200,off); ctx.lineTo(200,off); ctx.stroke();
+  // pitch lines
+  for(let p=-20;p<=20;p+=5){
+    if(p===0)continue; const y=off-p*2.5;
+    const len=p%10===0?30:18;
+    ctx.strokeStyle='rgba(255,255,255,0.7)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(-len/2,y); ctx.lineTo(len/2,y); ctx.stroke();
+    if(p%10===0){ctx.fillStyle='#fff';ctx.font='9px sans-serif';ctx.textAlign='left';ctx.fillText(Math.abs(p),len/2+3,y+3);}
+  }
+  ctx.restore();
+  // aircraft symbol
+  ctx.strokeStyle='#FFD700'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(w/2-30,h/2); ctx.lineTo(w/2-10,h/2); ctx.moveTo(w/2+10,h/2); ctx.lineTo(w/2+30,h/2); ctx.moveTo(w/2,h/2); ctx.lineTo(w/2,h/2-8); ctx.stroke();
+  // bank arc
+  ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.arc(w/2,h/2,52,-Math.PI,0); ctx.stroke();
+  // bank indicator
+  ctx.save(); ctx.translate(w/2,h/2); ctx.rotate(-S.bank*Math.PI/180);
+  ctx.fillStyle='#FFD700'; ctx.beginPath(); ctx.moveTo(0,-52); ctx.lineTo(-5,-42); ctx.lineTo(5,-42); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+// === MAP ===
+function drawMap(){
+  const c=document.getElementById('map-canvas');
+  const ctx=c.getContext('2d'); const w=220,h=110;
+  ctx.clearRect(0,0,w,h);
+  ctx.fillStyle='rgba(30,50,80,0.15)'; ctx.fillRect(0,0,w,h); ctx.strokeStyle='rgba(100,150,200,0.2)'; ctx.lineWidth=0.5;
+  for(let i=0;i<w;i+=20){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,h);ctx.stroke();}
+  for(let i=0;i<h;i+=20){ctx.beginPath();ctx.moveTo(0,i);ctx.lineTo(w,i);ctx.stroke();}
+  // route
+  const ox=30,oy=70,dx=180,dy=30;
+  ctx.strokeStyle='rgba(55,138,221,0.5)'; ctx.setLineDash([4,3]); ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(ox,oy); ctx.lineTo(dx,dy); ctx.stroke(); ctx.setLineDash([]);
+  // aircraft position (progress along route)
+  const prog=clamp((tick%600)/600,0,1);
+  const ax=ox+(dx-ox)*prog, ay=oy+(dy-oy)*prog;
+  // trail
+  ctx.strokeStyle='rgba(255,215,0,0.4)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(ox,oy); ctx.lineTo(ax,ay); ctx.stroke();
+  // aircraft icon
+  ctx.save(); ctx.translate(ax,ay); ctx.rotate((-S.hdg+270)*Math.PI/180+Math.PI/2);
+  ctx.fillStyle='#FFD700'; ctx.beginPath(); ctx.moveTo(0,-7); ctx.lineTo(-4,4); ctx.lineTo(0,2); ctx.lineTo(4,4); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  // airports
+  ctx.fillStyle='#639922'; ctx.beginPath(); ctx.arc(ox,oy,4,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#378ADD'; ctx.beginPath(); ctx.arc(dx,dy,4,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,0.8)'; ctx.font='9px sans-serif'; ctx.textAlign='left'; ctx.fillText('LTAI',ox+6,oy+3); ctx.fillText('LTBA',dx+6,dy+3);
+}
+
+// === PID LOOP ===
+function runPID(dt){
+  const pitchErr=S.targetPitch-S.pitch;
+  const rollErr=S.targetBank-S.bank;
+  const hdgErr=((S.targetHdg-S.hdg+540)%360)-180;
+  S.elevCmd=clamp(pidUpdate(S.pidPitch,pitchErr,dt)*15,-25,25);
+  S.ailCmd=clamp(pidUpdate(S.pidRoll,rollErr,dt)*10,-30,30);
+  S.rudCmd=clamp(pidUpdate(S.pidYaw,hdgErr*0.2,dt)*5,-20,20);
+  S.pitch+=pitchErr*0.02; S.bank+=rollErr*0.02; S.hdg=((S.hdg+hdgErr*0.005)+360)%360;
+}
+
+// === SCENARIO ENGINE ===
+const scenarios={
+  normal:{label:'Normal Uçuş',law:'NORMAL LAW',danger:false,
+    apply:function(){S.targetPitch=2.0;S.targetBank=0;S.e1=72+noise(1);S.e2=71+noise(1);S.egt=620+noise(5);}},
+  turbulence:{label:'Türbülans',law:'ALTERNATE LAW',danger:false,
+    apply:function(){S.pitch+=noise(3);S.bank+=noise(8);S.vs=noise(500);S.ias+=noise(15);S.g=1+Math.abs(noise(1.5));}},
+  icing:{label:'Buz Tutma',law:'NORMAL LAW',danger:false,
+    apply:function(){S.ias-=0.3;S.e1+=0.2;S.e2+=0.2;S.egt+=0.5;}},
+  stall:{label:'STALL UYARISI',law:'DIRECT LAW',danger:true,
+    apply:function(){S.aoa+=0.3;S.ias-=1;S.vs-=100;S.targetPitch=-5;}},
+  enginefail:{label:'Motor 1 ARIZA',law:'ALTERNATE LAW',danger:true,
+    apply:function(){S.e1=Math.max(0,S.e1-0.5);S.bank+=0.2;S.rudCmd+=5;}},
+  fire:{label:'Motor YANGIN',law:'NORMAL LAW',danger:true,
+    apply:function(){S.egt=Math.min(999,S.egt+2);}},
+  tcas:{label:'TCAS RA – CLIMB',law:'NORMAL LAW',danger:true,
+    apply:function(){S.targetPitch=8;S.targetBank=0;S.vs+=200;}},
+  gpws:{label:'GPWS – PULL UP',law:'NORMAL LAW',danger:true,
+    apply:function(){S.alt-=30;S.targetPitch=15;S.vs+=300;}}
+};
+
+function setMode(m){
+  S.mode=m; S.fcsLaw=scenarios[m].law;
+  document.querySelectorAll('.fcs-btn').forEach(b=>b.classList.remove('active'));
+  if(window.event && window.event.target){ window.event.target.classList.add('active'); }
+  if(scenarios[m].danger) triggerEmergency(scenarios[m].label);
+  else { clearEmergency(); }
+  addAlert(m==='normal'?'normal':'crit', scenarios[m].label+(scenarios[m].danger?' — ACİL PROTOKOL':''));
+  if(scenarios[m].danger) autoAIRespond(m);
+}
+
+function triggerEmergency(label){
+  emgActive=true;
+  document.getElementById('emerg-banner').style.display='block';
+  document.getElementById('emerg-banner').textContent='⚠ '+label.toUpperCase()+' — OTOMATİK MÜDAHALE DEVREDE ⚠';
+  document.getElementById('sys-led').className='status-led led-red';
+  document.getElementById('sys-status').textContent='ACİL DURUM';
+}
+function clearEmergency(){
+  emgActive=false;
+  document.getElementById('emerg-banner').style.display='none';
+  document.getElementById('sys-led').className='status-led led-green';
+  document.getElementById('sys-status').textContent='SİSTEM NORMAL';
+}
+
+const alertColors={crit:'dot-crit',warn:'dot-warn',info:'dot-info',normal:'dot-ok'};
+const maxAlerts=8;
+function addAlert(type,msg){
+  const list=document.getElementById('alert-list');
+  const t=document.getElementById('utc-val').textContent;
+  const div=document.createElement('div'); div.className='alert-item';
+  div.innerHTML=`<div class="alert-dot ${alertColors[type]||'dot-info'}"></div><div class="alert-text">${msg}</div><div class="alert-time">${t}</div>`;
+  list.insertBefore(div,list.firstChild);
+  while(list.children.length>maxAlerts) list.removeChild(list.lastChild);
+}
+
+// === AI LOG ===
+const AI_RUNTIME={
+  mode:'local',
+  proxyUrl:'', // örn: http://localhost:3000/ai
+  autoMonitor:true,
+  lastAdvice:''
+};
+
+function logAI(msg,cls='sys'){
+  const log=document.getElementById('ai-log');
+  const div=document.createElement('div'); div.className=`ai-msg ${cls}`;
+  div.textContent=msg; log.appendChild(div); log.scrollTop=log.scrollHeight;
+}
+
+const emergencyResponses={
+  stall:`STALL UYARISI: Burun aşağı, thrust artır, AoA azalt. Hız geri kazanılana kadar agresif pitch komutu verme.`,
+  enginefail:`ENG1 ARIZA: Asimetriyi rudder ile dengele. Motor parametrelerini izole et. En yakın uygun meydana yönel.`,
+  fire:`YANGIN: Etkilenen motoru emniyete al, yangın prosedürünü uygula, acil alçalma ve alternatif meydan planını başlat.`,
+  tcas:`TCAS RA: Dikey komutu önceliklendir. ATC bildirimi ikincil, kaçış manevrası birincil.`,
+  gpws:`GPWS PULL UP: Maksimum güvenli tırmanış komutu uygula, arazi kaçışını sürdür, konfigürasyonu sade tut.`,
+  turbulence:`TÜRBÜLANS: Manevra hızına yaklaş, bank açılarını yumuşat, dikey hız salınımını sınırlı tut.`,
+  icing:`BUZ TUTMA: Anti-ice aktif et, sürati koru, gereksiz tırmanışı kes, sensör sapmalarını takip et.`
+};
+
+function getFlightSnapshot(){
+  const fuelFlowEstimate=Math.max(1800,Math.round((S.e1+S.e2)*32));
+  const fuelEnduranceMin=Math.max(0,Math.round((S.fuel/fuelFlowEstimate)*60));
+  return {
+    scenario: scenarios[S.mode].label,
+    ias: Math.round(S.ias),
+    tas: Math.round(S.tas),
+    mach: S.mach,
+    alt: Math.round(S.alt),
+    hdg: Math.round(S.hdg),
+    vs: Math.round(S.vs),
+    pitch: rnd(S.pitch),
+    bank: rnd(S.bank),
+    aoa: rnd(S.aoa),
+    g: rnd(S.g,2),
+    e1: Math.round(S.e1),
+    e2: Math.round(S.e2),
+    egt: Math.round(S.egt),
+    fuel: Math.round(S.fuel),
+    eta: `${String(Math.floor(S.eta/60)).padStart(2,'0')}:${String(Math.round(S.eta%60)).padStart(2,'0')}`,
+    fuelFlowEstimate,
+    fuelEnduranceMin,
+    lat: S.lat,
+    lon: S.lon,
+    phase: S.phase,
+    fcsLaw: S.fcsLaw,
+    risk: computeRiskLevel()
+  };
+}
+
+function computeRiskLevel(){
+  let score=0;
+  if(scenarios[S.mode].danger) score+=3;
+  if(S.aoa>10) score+=2;
+  if(S.aoa>15) score+=2;
+  if(S.egt>800) score+=2;
+  if(S.fuel<6000) score+=1;
+  if(S.fuel<3000) score+=2;
+  if(Math.abs(S.bank)>25) score+=1;
+  if(Math.abs(S.vs)>1800) score+=1;
+  if(S.e1<40 || S.e2<40) score+=2;
+  if(score>=7) return 'KRİTİK';
+  if(score>=4) return 'ORTA';
+  return 'DÜŞÜK';
+}
+
+function updateAIRiskBadge(){
+  const risk=computeRiskLevel();
+  const el=document.getElementById('ai-risk');
+  el.textContent=risk;
+  el.className='metric-value '+(risk==='KRİTİK'?'crit':risk==='ORTA'?'warn':'ok');
+}
+
+function formatSummary(s){
+  return `Durum özeti: ${s.phase}, ${s.alt} ft, IAS ${s.ias} kt, HDG ${s.hdg}, yakıt ${s.fuel} kg, risk ${s.risk}.`;
+}
+
+function getChecklistForMode(){
+  const map={
+    stall:['Pitch azalt','Thrust artır','Kanatları düzle','Hız toparlanınca yeniden trimle'],
+    enginefail:['Arızalı motoru doğrula','Yaw dengele','Tek motor performansını kontrol et','Alternatif meydana yönel'],
+    fire:['Yangın tarafını doğrula','İzolasyon uygula','Söndürme ajanını devreye al','Acil yaklaşma planı başlat'],
+    tcas:['RA komutunu uygula','Dikey profili koru','ATC bildir','Trafik ayrımını izle'],
+    gpws:['Maksimum tırmanış','Konfigürasyonu sadeleştir','Arazi kaçışını sürdür','Emniyetli irtifada stabilize ol'],
+    icing:['Anti-ice aç','Sürati artır','AoA ve pitot sapmalarını izle','Daha uygun irtifa değerlendir'],
+    turbulence:['Manevra hızına yaklaş','Bank açılarını azalt','Kabini emniyete al','ATC deviasyonu iste']
+  };
+  return map[S.mode] || ['Sistemleri izlemeyi sürdür','Trend bozulursa müdahale et'];
+}
+
+function handleCommand(q){
+  const lower=q.toLowerCase('tr-TR');
+  const headingMatch=lower.match(/heading\s*(\d{2,3})/i) || lower.match(/baş(?:ı|i)\s*(\d{2,3})/i);
+  const altitudeMatch=lower.match(/irtifa\s*(\d{3,5})/i) || lower.match(/altitude\s*(\d{3,5})/i);
+  const pitchMatch=lower.match(/pitch\s*(-?\d{1,2})/i);
+  const bankMatch=lower.match(/bank\s*(-?\d{1,2})/i);
+
+  if(lower.includes('normal')){S.mode='normal'; clearEmergency(); return 'Senaryo NORMAL UÇUŞ moduna alındı.';}
+  if(lower.includes('türbülans')){triggerScenario('turbulence'); return 'Türbülans senaryosu aktive edildi.';}
+  if(lower.includes('buz')){triggerScenario('icing'); return 'Buz tutma senaryosu aktive edildi.';}
+  if(lower.includes('stall')){triggerScenario('stall'); return 'Stall senaryosu aktive edildi.';}
+  if(lower.includes('motor arıza')||lower.includes('enginefail')){triggerScenario('enginefail'); return 'Motor arıza senaryosu aktive edildi.';}
+  if(lower.includes('yangın')||lower.includes('fire')){triggerScenario('fire'); return 'Yangın senaryosu aktive edildi.';}
+  if(lower.includes('tcas')){triggerScenario('tcas'); return 'TCAS RA senaryosu aktive edildi.';}
+  if(lower.includes('gpws')){triggerScenario('gpws'); return 'GPWS senaryosu aktive edildi.';}
+  if(lower.includes('ap kapat')){S.apOn=false; document.getElementById('m-ap').textContent='AP OFF'; addAlert('warn','Otopilot devre dışı'); return 'AP kapatıldı. Manuel stabilite takibi gerekli.';}
+  if(lower.includes('ap aç')){S.apOn=true; document.getElementById('m-ap').textContent='AP1'; addAlert('info','Otopilot yeniden devrede'); return 'AP tekrar devrede.';}
+  if(headingMatch){S.targetHdg=clamp(parseInt(headingMatch[1],10),0,359); return `Yeni hedef heading ${S.targetHdg}° olarak ayarlandı.`;}
+  if(altitudeMatch){const alt=clamp(parseInt(altitudeMatch[1],10),1000,45000); S.targetPitch=alt>S.alt?4:-3; S.phase=alt>S.alt?'CLIMB':'DESCENT'; return `İrtifa komutu ${alt} ft olarak alındı. Tırmanış/alçalma profili güncellendi.`;}
+  if(pitchMatch){S.targetPitch=clamp(parseInt(pitchMatch[1],10),-15,20); return `Hedef pitch ${S.targetPitch}° yapıldı.`;}
+  if(bankMatch){S.targetBank=clamp(parseInt(bankMatch[1],10),-30,30); return `Hedef bank ${S.targetBank}° yapıldı.`;}
+  return null;
+}
+
+function triggerScenario(mode){
+  S.mode=mode; S.fcsLaw=scenarios[mode].law;
+  if(scenarios[mode].danger) triggerEmergency(scenarios[mode].label); else clearEmergency();
+  addAlert(scenarios[mode].danger?'crit':'info', scenarios[mode].label + (scenarios[mode].danger?' — AI komutuyla aktif':''));
+  autoAIRespond(mode);
+}
+
+function generateLocalAIReply(q){
+  const cmdResult=handleCommand(q);
+  if(cmdResult) return cmdResult;
+
+  const s=getFlightSnapshot();
+  const lower=q.toLowerCase('tr-TR');
+
+  if(lower.includes('durum') || lower.includes('değerlendir') || lower.includes('status')){
+    return `${formatSummary(s)} Motorlar ${s.e1}% / ${s.e2}%, EGT ${s.egt}°C, AoA ${s.aoa}°. FCS modu ${s.fcsLaw}.`;
+  }
+  if(lower.includes('yakıt')){
+    return `Yakıt ${s.fuel} kg. Tahmini tüketim ${s.fuelFlowEstimate} kg/saat. Dayanım yaklaşık ${s.fuelEnduranceMin} dk. ETA ${s.eta}; mevcut profilde yakıt yeterliliği ${s.fuelEnduranceMin>75?'uygun':s.fuelEnduranceMin>45?'sınırlı':'kritik'}.`;
+  }
+  if(lower.includes('hava')){
+    return `Mevcut dış sıcaklık ${S.oat}°C ve rüzgar ${S.wind}. ${S.mode==='icing'?'Buzlanma tehdidi yüksek; anti-ice ve hız marjı önemli.':S.mode==='turbulence'?'Türbülans yükleri artmış; yumuşak kontrol girişleri önerilir.':'Meteorolojik etki şu anda yönetilebilir seviyede.'}`;
+  }
+  if(lower.includes('alternatif')){
+    return `Alternatif meydan önerisi: birincil LTAI geri dönüş, ikincil LTBA devam, emniyet odaklı kısa rota için durum ${s.risk==='KRİTİK'?'en yakın uygun meydana yönelmeyi':'mevcut rotayı korumayı'} destekliyor.`;
+  }
+  if(lower.includes('checklist') || lower.includes('prosedür') || lower.includes('acil')){
+    return `Kısa checklist: ${getChecklistForMode().join(' → ')}.`;
+  }
+  if(lower.includes('optimize') || lower.includes('iyileştir')){
+    return `Optimizasyon önerisi: IAS ${s.ias} kt, bank ${s.bank}°, dikey hız ${s.vs} fpm. Yakıt ekonomisi için bankı 10° altı, dikey hızı ±500 fpm aralığında ve thrust farkını minimumda tut.`;
+  }
+  if(lower.includes('risk')){
+    return `Risk seviyesi ${s.risk}. Baskın etkenler: senaryo=${s.scenario}, AoA=${s.aoa}°, EGT=${s.egt}°C, yakıt=${s.fuel} kg.`;
+  }
+  if(lower.includes('rota')){
+    return `Aktif rota LTAI → LTBA. Mevcut baş ${s.hdg}°. Pozisyon ${s.lat}N ${s.lon}E. Sapma düşük, LNAV izleme nominal.`;
+  }
+  return `${formatSummary(s)} Komutu anladım. 'durum', 'yakıt', 'alternatif', 'checklist', 'heading 300', 'pitch 5', 'ap kapat' gibi daha net komut verirsen doğrudan uygularım.`;
+}
+
+async function askAI(){
+  const input=document.getElementById('ai-input');
+  const q=input.value.trim(); if(!q)return;
+  input.value='';
+  logAI(`[Pilot] ${q}`,'ai');
+  document.getElementById('ai-status-bar').textContent='AI: İŞLİYOR...';
+  const t0=performance.now();
+
+  try{
+    let reply='';
+    if(AI_RUNTIME.mode==='proxy' && AI_RUNTIME.proxyUrl){
+      const payload={question:q,state:getFlightSnapshot(),scenario:S.mode};
+      const res=await fetch(AI_RUNTIME.proxyUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      const data=await res.json();
+      reply=data.reply || data.message || 'Proxy yanıtı boş döndü.';
+      document.getElementById('ai-runtime-mode').textContent='PROXY AI';
+    }else{
+      reply=generateLocalAIReply(q);
+      document.getElementById('ai-runtime-mode').textContent='LOKAL AI';
+    }
+    logAI(`[AI] ${reply}`,'ai');
+    document.getElementById('ai-rt').textContent=`${Math.round(performance.now()-t0)}ms`;
+  }catch(e){
+    const fallback=generateLocalAIReply(q);
+    logAI(`[AI] ${fallback}`,'warn');
+    document.getElementById('ai-rt').textContent=`${Math.round(performance.now()-t0)}ms`;
+  }
+
+  updateAIRiskBadge();
+  document.getElementById('ai-status-bar').textContent='AI: HAZIR';
+}
+
+function quickAsk(q){document.getElementById('ai-input').value=q;askAI();}
+
+function autoAIRespond(mode){
+  const resp=emergencyResponses[mode];
+  if(resp){setTimeout(()=>{logAI(`[AI FCS] ${resp}`,'crit'); updateAIRiskBadge();},600);}
+}
+
+function autoMonitorAI(){
+  if(!AI_RUNTIME.autoMonitor || tick%80!==0) return;
+  const s=getFlightSnapshot();
+  let advice='';
+  if(s.risk==='KRİTİK') advice=`[AI MONITOR] Kritik trend: ${s.scenario}. AoA ${s.aoa}°, EGT ${s.egt}°C, yakıt ${s.fuel} kg. Kısa checklist önerilir.`;
+  else if(S.mode==='turbulence') advice='[AI MONITOR] Türbülans aktif. Bank komutlarını yumuşat, sürati manevra zarfında tut.';
+  else if(S.mode==='icing') advice='[AI MONITOR] Buzlanma etkisi izleniyor. Anti-ice ve hız marjı korunmalı.';
+  else if(s.fuel<5000) advice='[AI MONITOR] Yakıt marjı azalıyor. Alternatif meydan ve iniş planı gözden geçirilmeli.';
+
+  if(advice && advice!==AI_RUNTIME.lastAdvice){
+    AI_RUNTIME.lastAdvice=advice;
+    logAI(advice, s.risk==='KRİTİK'?'crit':'sys');
+  }
+}
+// === MAIN SIMULATION LOOP ===
+function update(){
+  tick++; const dt=0.05;
+  S.simTime+=dt;
+  // apply scenario
+  scenarios[S.mode].apply();
+  // PID control
+  runPID(dt);
+  // physics drift
+  S.ias=clamp(S.ias+noise(0.3)+pidNoise(),-0,600);
+  S.alt+=S.vs*dt/60+noise(S.mode==='gpws'?-15:2);
+  S.fuel=Math.max(0,S.fuel-0.8);
+  S.lat=rnd(S.lat+0.0001*(Math.sin(S.hdg*Math.PI/180)),4);
+  S.lon=rnd(S.lon+0.0001*(Math.cos(S.hdg*Math.PI/180)),4);
+  S.tas=rnd(S.ias*1.115,0);
+  S.mach=rnd(S.ias/350,2);
+  S.eta=Math.max(0,S.eta-dt/60);
+  if(S.mode==='normal'){S.aoa=rnd(3.2+noise(0.2),1);S.g=rnd(1.0+noise(0.05),2);}
+  // update DOM
+  document.getElementById('v-ias').textContent=Math.round(S.ias);
+  document.getElementById('v-tas').textContent=Math.round(S.tas);
+  document.getElementById('v-mach').textContent=S.mach;
+  document.getElementById('v-vs').textContent=Math.round(S.vs);
+  document.getElementById('v-pitch').textContent=rnd(S.pitch);
+  document.getElementById('v-bank').textContent=rnd(S.bank);
+  document.getElementById('v-alt').textContent=Math.round(S.alt).toLocaleString();
+  document.getElementById('v-hdg').textContent=Math.round(S.hdg);
+  document.getElementById('v-pos').textContent=`${S.lat}°N ${S.lon}°E`;
+  document.getElementById('v-eta').textContent=`${String(Math.floor(S.eta/60)).padStart(2,'0')}:${String(Math.round(S.eta%60)).padStart(2,'0')}`;
+  document.getElementById('g-val').textContent=rnd(S.g)+'g';
+  document.getElementById('g-fill').style.width=clamp(S.g/3*100,0,100)+'%';
+  document.getElementById('aoa-val').textContent=rnd(S.aoa)+'°';
+  document.getElementById('aoa-fill').style.width=clamp(S.aoa/25*100,0,100)+'%';
+  setEngineBar('e1',S.e1); setEngineBar('e2',S.e2);
+  document.getElementById('egt-val').textContent=Math.round(S.egt)+'°';
+  document.getElementById('egt-fill').style.width=clamp(S.egt/900*100,0,100)+'%';
+  document.getElementById('egt-fill').className='gauge-fill '+(S.egt>850?'fill-red':S.egt>750?'fill-amber':'fill-amber');
+  document.getElementById('fuel-val').textContent=Math.round(S.fuel).toLocaleString();
+  document.getElementById('fuel-fill').style.width=clamp(S.fuel/20000*100,0,100)+'%';
+  document.getElementById('fuel-fill').className='gauge-fill '+(S.fuel<3000?'fill-red':S.fuel<6000?'fill-amber':'fill-blue');
+  // PID outputs
+  setPIDBar('pid-elev',S.elevCmd,25); setPIDBar('pid-ail',S.ailCmd,30); setPIDBar('pid-rud',S.rudCmd,20);
+  document.getElementById('pid-elev-v').textContent=rnd(S.elevCmd)+'°';
+  document.getElementById('pid-ail-v').textContent=rnd(S.ailCmd)+'°';
+  document.getElementById('pid-rud-v').textContent=rnd(S.rudCmd)+'°';
+  // speed tape
+  document.getElementById('spd-ptr').textContent=Math.round(S.ias);
+  document.getElementById('spd-ptr').style.top=clamp(50-(S.ias-260)*0.3,5,70)+'px';
+  // scenario label
+  document.getElementById('scenario-lbl').textContent=scenarios[S.mode].label;
+  document.getElementById('fcs-mode-lbl').textContent=S.fcsLaw;
+  document.getElementById('phase-val').textContent=S.phase;
+  // UTC
+  const now=new Date();
+  document.getElementById('utc-val').textContent=now.toUTCString().slice(17,25);
+  // danger coloring
+  document.getElementById('v-ias').className='metric-value'+(S.ias<200||S.ias>380?' crit':S.ias<230||S.ias>340?' warn':'');
+  document.getElementById('aoa-val').className='metric-value'+(S.aoa>15?' crit':S.aoa>10?' warn':'ok');
+  // auto alerts (throttle)
+  if(tick%120===0&&S.mode==='normal') addAlert('info','FCS nagel check — nominal');
+  if(S.fuel<3000&&tick%60===0) addAlert('warn','FUEL LOW — '+Math.round(S.fuel)+'kg');
+  if(S.aoa>15&&tick%30===0) addAlert('crit','STALL — AoA krit '+rnd(S.aoa)+'°');
+  if(S.egt>850&&tick%60===0) addAlert('crit','EGT yüksek — '+Math.round(S.egt)+'°C');
+  drawAH(); drawMap();
+  updateAIRiskBadge();
+  autoMonitorAI();
+}
+function pidNoise(){return noise(S.mode==='turbulence'?2:S.mode==='stall'?-1:0);}
+function setEngineBar(id,val){
+  document.getElementById(id+'-val').textContent=Math.round(val)+'%';
+  document.getElementById(id+'-fill').style.width=clamp(val,0,100)+'%';
+  document.getElementById(id+'-fill').className='gauge-fill '+(val<30?'fill-red':val<50?'fill-amber':'fill-green');
+}
+function setPIDBar(id,val,max){
+  const pct=50+(val/max)*50;
+  document.getElementById(id).style.width=clamp(pct,0,100)+'%';
+}
+// init log
+logAI('[SYS] FCS v3.1 başlatıldı — AI yardımcı pilot aktif','sys');
+logAI('[SYS] Rota: LTAI → LTBA | FL350 | M0.78','sys');
+logAI('[AI] Merhaba. Yardımcı pilot aktif. Durum, yakıt, alternatif, checklist ve kontrol komutlarını anlayabiliyorum.','ai');
+updateAIRiskBadge();
+setInterval(update,100);
+</script>
