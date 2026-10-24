@@ -530,6 +530,7 @@ async function askAI(){
     if(AI_RUNTIME.mode==='proxy' && AI_RUNTIME.proxyUrl){
       const payload={question:q,state:getFlightSnapshot(),scenario:S.mode};
       const res=await fetch(AI_RUNTIME.proxyUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      if (!res.ok) throw new Error(`Proxy HTTP ${res.status}`);
       const data=await res.json();
       reply=data.reply || data.message || 'Proxy yanıtı boş döndü.';
       document.getElementById('ai-runtime-mode').textContent='PROXY AI';
