@@ -383,19 +383,9 @@ async function askAI(){
   logAI(`[Pilot] ${q}`,'ai');
   document.getElementById('ai-status-bar').textContent='AI: İŞLİYOR...';
   const t0=performance.now();
-  const state=`İrtifa: ${Math.round(S.alt)}ft, IAS: ${Math.round(S.ias)}kt, Pitch: ${rnd(S.pitch)}°, Bank: ${rnd(S.bank)}°, HDG: ${Math.round(S.hdg)}°, V/S: ${Math.round(S.vs)}fpm, Eng1: ${rnd(S.e1)}%, Eng2: ${rnd(S.e2)}%, EGT: ${Math.round(S.egt)}°C, Yakıt: ${Math.round(S.fuel)}kg, Senaryo: ${scenarios[S.mode].label}`;
-  try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:350,messages:[
-        {role:'user',content:`Sen bir B737/A320 uçuşunun AI yardımcı pilotusun. Kısa, net, profesyonel pilot terminolojisiyle yanıtla.\n\nMevcut uçuş durumu: ${state}\n\nPilot sorusu: ${q}`}
-      ]})
-    });
-    const d=await res.json();
-    const txt=(d.content&&d.content[0]&&d.content[0].text)||'Yanıt alınamadı';
-    logAI(`[AI] ${txt}`,'ai');
-    document.getElementById('ai-rt').textContent=`${Math.round(performance.now()-t0)}ms`;
-  }catch(e){logAI('[AI] API bağlantısı kuruluyor...','warn');}
+  const response=emergencyResponses[S.mode] || 'Simülasyon normal durumda. Bu yanıt yerel demo kurallarından üretilir.';
+  logAI(`[Yerel demo] ${response}`,'ai');
+  document.getElementById('ai-rt').textContent=`${Math.round(performance.now()-t0)}ms`;
   document.getElementById('ai-status-bar').textContent='AI: HAZIR';
 }
 
@@ -482,3 +472,4 @@ logAI('[SYS] Rota: LTAI → LTBA | FL350 | M0.78','sys');
 logAI('[AI] Merhaba. Uçuş FLT-2847 devralındı. Tüm sistemler nominal.','ai');
 setInterval(update,100);
 </script>
+
